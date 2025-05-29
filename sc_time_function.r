@@ -97,8 +97,8 @@ sc_time_function=function(
     L=cbind(L,L[,1]-L[,2])
     delt=t(L)%*%as.matrix(coefficients(summary(mod))[,1])
     se_delt=sqrt(diag(t(L)%*%vcov(mod)%*%L))
-    ll_delt=slp+se_delt*qt(0.025,length(summary(mod)$residuals)-nrow(coefficients(summary(mod))))
-    ul_delt=slp+se_delt*qt(0.975,length(summary(mod)$residuals)-nrow(coefficients(summary(mod))))
+    ll_delt=delt+se_delt*qt(0.025,length(summary(mod)$residuals)-nrow(coefficients(summary(mod))))
+    ul_delt=delt+se_delt*qt(0.975,length(summary(mod)$residuals)-nrow(coefficients(summary(mod))))
     
     out_tab2=data.frame(
       PE=round(delt,digits),
