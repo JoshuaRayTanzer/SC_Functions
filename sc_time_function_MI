@@ -1,0 +1,225 @@
+sc_time_function_MI=function(
+    mod,
+    imp_datasets,
+    min,
+    max,
+    length=100,
+    cross_section=NULL,
+    fill=c(NA,NA),
+    alpha=0.3,
+    linetype=1,
+    linewidth=0.2,
+    v_linetype=1,
+    v_linewidth=0.2,
+    xlab="Follow Up",
+    ylab="Outcome",
+    main="Plot of Outcome over Time",
+    ylim=c(-2,2),
+    digits=3,
+    center_value=6
+){
+  
+  
+  
+  imp_num=length(imp_datasets)
+  
+  blurb=data.frame("Beginning imputed model estimation, this may take some time!")
+  colnames(blurb)=""
+  rownames(blurb)=""
+  print(noquote(blurb))
+  
+  pe_mat1=pe_mat2=se_mat1=se_mat2=NULL
+  slp=se_slp=NULL
+  delt=se_delt=NULL
+  for(i in 1:imp_num){
+    d=imp_datasets[[i]]
+    f=formula(mod)
+    m=lmer(f,data=d)
+    
+    t=seq(min,max,length=length)
+    
+    
+    g1=g2=NULL
+    for(e in t){
+      g1=cbind(g1,c(1,0,e,0))
+      g2=cbind(g2,c(1,1,e,e))
+    }
+    
+    pe1=t(g1)%*%as.matrix(coefficients(summary(m))[,1])
+    pe2=t(g2)%*%as.matrix(coefficients(summary(m))[,1])
+    pe_mat1=rbind(pe_mat1,c(pe1))
+    pe_mat2=rbind(pe_mat2,c(pe2))
+    
+    se1=sqrt(diag(t(g1)%*%vcov(m)%*%g1))
+    se2=sqrt(diag(t(g2)%*%vcov(m)%*%g2))
+    se_mat1=rbind(se_mat1,c(se1))
+    se_mat2=rbind(se_mat2,c(se2))
+    
+    
+    
+    L2=cbind(c(0,0,1,0),c(0,0,1,1),c(0,0,0,1))
+    
+    slp=rbind(slp,c(t(L2)%*%as.matrix(coefficients(summary(m))[,1])))
+    
+    se_slp=rbind(se_slp,c(sqrt(diag(t(L2)%*%vcov(m)%*%L2))))
+    
+    
+    if(is.null(cross_section)==F){
+      L=cbind(c(1,0,cross_section,0),c(1,1,cross_section,cross_section))
+      L=cbind(L,L[,1]-L[,2])
+      delt=rbind(delt,c(t(L)%*%as.matrix(coefficients(summary(m))[,1])))
+      se_delt=rbind(se_delt,c(sqrt(diag(t(L)%*%vcov(m)%*%L))))
+      
+    }
+    
+    blurb=data.frame(paste(i," / ",imp_num," = ",round((i/imp_num)*100,0),"%",sep=""))
+    colnames(blurb)=""
+    rownames(blurb)=""
+    print(noquote(blurb))
+    
+  }
+  
+  bar_pe1=colMeans(pe_mat1)
+  bar_se1=colMeans(se_mat1)
+  v1=diag(var(pe_mat1))
+  v_tot1=bar_se1^2+v1+v1/imp_num
+  df1=(imp_num-1)*(1+(bar_se1^2/((v1+(v1/imp_num)))))^2
+  
+  bar_pe2=colMeans(pe_mat2)
+  bar_se2=colMeans(se_mat2)
+  v2=diag(var(pe_mat2))
+  v_tot2=bar_se2^2+v2+v2/imp_num
+  df2=(imp_num-1)*(1+(bar_se2^2/((v2+(v2/imp_num)))))^2
+  
+  ll1=bar_pe1+sqrt(v_tot1)*qt(0.025,df1)
+  ll2=bar_pe2+sqrt(v_tot2)*qt(0.025,df2)
+  
+  ul1=bar_pe1+sqrt(v_tot1)*qt(0.975,df1)
+  ul2=bar_pe2+sqrt(v_tot2)*qt(0.975,df2)
+  
+  gg_inf=data.frame(
+    m=c(bar_pe1,bar_pe2),
+    se=c(sqrt(v_tot1),sqrt(v_tot2)),
+    ll=c(ll1,ll2),
+    ul=c(ul1,ul2),
+    time=c(t+center_value,t+center_value),
+    Group=c(rep("Comparison group",length),rep("TB survivors",length))
+  )
+  
+  bar_slp=colMeans(slp)
+  bar_selp=colMeans(se_slp)
+  v_slp=diag(var(slp))
+  v_tot_slp=bar_selp^2+v_slp+v_slp/imp_num
+  df_slp=(imp_num-1)*(1+(bar_selp^2/((v_slp+(v_slp/imp_num)))))^2
+  
+  
+  ll_slp=bar_slp+sqrt(v_tot_slp)*qt(0.025,df_slp)
+  ul_slp=bar_slp+sqrt(v_tot_slp)*qt(0.975,df_slp)
+  
+  p_slp=ifelse(2*pt(-abs(bar_slp)/sqrt(v_tot_slp),df_slp)<0.001,"< 0.001",round(2*pt(-abs(bar_slp)/sqrt(v_tot_slp),df_slp),3))
+  
+  blurb=data.frame("Estimates of Changes Over Time")
+  rownames(blurb)=""
+  colnames(blurb)=""
+  
+  print(blurb)
+  
+  out_tab=data.frame(
+    PE=round(bar_slp,digits),
+    SE=round(sqrt(v_tot_slp),digits),
+    DF=round(df_slp,digits),
+    LL=round(ll_slp,digits),
+    UL=round(ul_slp,digits),
+    p=p_slp
+  )
+  
+  
+  
+  g=ggplot(data=gg_inf,aes(x=time,y=m,group=Group))+
+    geom_line(linetype=linetype,linewidth=linewidth)+
+    geom_ribbon(aes(ymin=ll,ymax=ul,fill=Group),alpha=alpha)+
+    scale_fill_manual(values=fill)+
+    ylim(ylim)+
+    xlab(xlab)+
+    ylab(ylab)+
+    geom_vline(xintercept=cross_section+center_value,linetype=v_linetype,linewidth=v_linewidth)+
+    ggtitle(main)
+  print(g)
+  
+  rownames(out_tab)=c("Comparison group","TB survivors","Difference in Slopes")
+  print(out_tab)
+  
+  
+  if(is.null(cross_section)==F){
+    bar_delt=colMeans(delt)
+    bar_se_delt=colMeans(se_delt)
+    v_delt=diag(var(delt))
+    v_tot_delt=bar_se_delt^2+v_delt+v_delt/imp_num
+    df_delt=(imp_num-1)*(1+(bar_se_delt^2/((v_delt+(v_delt/imp_num)))))^2
+    
+    ll_delt=bar_delt+sqrt(v_tot_delt)*qt(0.025,df_delt)
+    ul_delt=bar_delt+sqrt(v_tot_delt)*qt(0.975,df_delt)
+    
+    out_tab2=data.frame(
+      PE=round(bar_delt,digits),
+      SE=round(sqrt(v_tot_delt),digits),
+      DF=round(df_delt,digits),
+      LL=round(ll_delt,digits),
+      UL=round(ul_delt,digits)
+    )
+    
+    blurb=data.frame(paste("Difference in Averages at ",cross_section+center_value," Month Follow Up",sep=""))
+    rownames(blurb)=""
+    colnames(blurb)=""
+    print(blurb)
+    
+    rownames(out_tab2)=c("Comparison group","TB survivors","Difference in Averages")
+    print(out_tab2)
+    
+    blurb=data.frame(paste("Test of difference in averages at ",cross_section+center_value," Month follow up: p ",
+                           ifelse(2*pt(-abs(delt[3])/se_delt[3],length(summary(mod)$residuals)-nrow(coefficients(summary(mod))))<0.001,"< 0.001",paste("= ",round(2*pt(-abs(delt[3])/se_delt[3],length(summary(mod)$residuals)-nrow(coefficients(summary(mod)))),3),sep="")),sep=""))
+    rownames(blurb)=""
+    colnames(blurb)=""
+    
+    print(blurb)
+    
+  }
+  
+  blurb=data.frame("Note: PE = Point Estimate; SE = Standard Error; DF = Degrees of Freedom; LL = Lower Limit; UL = Upper Limit; p is the p value testing the null hypothesis of zero (i.e., no change over time, or no difference in changes over time)")
+  rownames(blurb)=""
+  colnames(blurb)=""
+  
+  print(noquote(blurb))
+  
+  out=list()
+  
+  out$slopes=c(bar_slp)
+  out$slopes_se=c(sqrt(v_tot_slp))
+  out$slopes_ll=c(ll_slp)
+  out$slopes_ul=c(ul_slp)
+  out$slopes_t=c(bar_slp/sqrt(v_tot_slp))
+  out$df=c(df_slp)
+  out$slopes_p=c(2*pt(-abs(bar_slp)/sqrt(v_tot_slp),df_slp))
+  
+  if(is.null(cross_section)==F){
+    out$difference=c(bar_delt)
+    out$difference_se=c(sqrt(v_tot_delt))
+    out$difference_ll=c(ll_delt)
+    out$difference_ul=c(ul_delt)
+    out$difference_t=bar_delt[3]/sqrt(v_tot_delt)[3]
+    out$p_value=pt(-abs(bar_delt[3])/sqrt(v_tot_delt)[3],df_delt[3])
+  }
+  
+  out$chart_data=gg_inf
+  out$chart_code="ggplot(data=gg_inf,aes(x=time,y=m,group=Group))+
+  geom_line(linetype=linetype,linewidth=linewidth)+
+  geom_ribbon(aes(ymin=ll,ymax=ul,fill=Group),alpha=alpha)+
+  scale_fill_manual(values=fill)+
+  ylim(ylim)+
+  xlab(xlab)+
+  ylab(ylab)+
+  geom_vline(xintercept=cross_section)+
+  ggtitle(main)"
+  
+  return(out)
+}
