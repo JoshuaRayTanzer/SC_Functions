@@ -1,9 +1,9 @@
-sc_imputed_table=function(input_data_list,complete_cases_data,rounding=0){
-
+sc_imputed_table=function(input_data_list,complete_cases_data,formula,rounding=0){
+  var_form=formula(formula)
   imp_num=length(input_data_list)
   imp_tab=list()
   for(i in 1:imp_num){
-    hold=summary(tableby(group ~ catPREobstructive + catPRErestrictive + catPREmixed + catPOSTobstructive + catPOSTrestrictive + catPOSTmixed + reverse, data = input_data_list[[i]], stats = TRUE))
+    hold=summary(tableby(var_form, data = input_data_list[[i]], stats = TRUE))
     
     
     n1=n2=n3=p1=p2=p3=NULL
@@ -66,7 +66,7 @@ sc_imputed_table=function(input_data_list,complete_cases_data,rounding=0){
   
   
   
-  hold_cc=summary(tableby(group ~ catPREobstructive + catPRErestrictive + catPREmixed + catPOSTobstructive + catPOSTrestrictive + catPOSTmixed + reverse, data = complete_cases_data, stats = TRUE))
+  hold_cc=summary(tableby(var_form, data = complete_cases_data, stats = TRUE))
   
   
   n1=n2=n3=p1=p2=p3=NULL
