@@ -1,0 +1,236 @@
+sc_imputed_table=function(input_data_list,complete_cases_data,rounding=0){
+
+  imp_num=length(input_data_list)
+  imp_tab=list()
+  for(i in 1:imp_num){
+    hold=summary(tableby(group ~ catPREobstructive + catPRErestrictive + catPREmixed + catPOSTobstructive + catPOSTrestrictive + catPOSTmixed, data = input_data_list[[i]], stats = TRUE))
+    
+    
+    n1=n2=n3=p1=p2=p3=NULL
+    for(p in 1:nrow(hold$object$group)){
+      if((length(hold$object$group[,8][[p]])==1&c(hold$object$group[,8][[p]])=="")[1]){
+        n1=c(n1,"")
+        n2=c(n2,"")
+        n3=c(n3,"")
+        p1=c(p1,"")
+        p2=c(p2,"")
+        p3=c(p3,"")
+      }else{
+        n1=c(n1,hold$object$group[,8][[p]][1])
+        n2=c(n2,hold$object$group[,9][[p]][1])
+        n3=c(n3,hold$object$group[,10][[p]][1])
+        p1=c(p1,hold$object$group[,8][[p]][2])
+        p2=c(p2,hold$object$group[,9][[p]][2])
+        p3=c(p3,hold$object$group[,10][[p]][2])
+        
+      }
+    }
+    
+    
+    delt=se=NULL
+    for(p in 1:nrow(hold$object$group)){
+      if(n1[p]==""){
+        size1=as.numeric(n1[p+1])+as.numeric(n1[p+2])
+        size2=as.numeric(n2[p+1])+as.numeric(n2[p+2])
+        prob1=as.numeric(p1[p+1])/100
+        prob2=as.numeric(p2[p+1])/100
+        delt=c(delt,(prob1-prob2))
+        v1=prob1*(1-prob1)/size1
+        v2=prob2*(1-prob2)/size2
+        se=c(se,sqrt(v1+v2))
+        
+      }else{
+        delt=c(delt,"")
+        se=c(se,"")
+      }
+    }
+    
+    out_tab=data.frame(n1,p1,n2,p2,n3,p3,delt,se)
+    for(p in 1:ncol(out_tab)){
+      out_tab[,p]=ifelse(out_tab[,p]=="",NA,out_tab[,p])
+      out_tab[,p]=as.numeric(out_tab[,p])
+    }
+    nam=NULL
+    count=rep(0:2,nrow(out_tab)/3)
+    for(p in 1:nrow(out_tab)){
+      if(count[p]==0){
+        nam=c(nam,hold$object$group$variable[p])
+      }else{
+        nam=c(nam,paste(hold$object$group$variable[p],hold$object$group$label[p]))
+      }
+    }
+    out_tab=data.frame(out_tab)
+    rownames(out_tab)=c(nam)
+    imp_tab[[i]]=out_tab
+  }
+  
+  
+  
+  hold_cc=summary(tableby(group ~ catPREobstructive + catPRErestrictive + catPREmixed + catPOSTobstructive + catPOSTrestrictive + catPOSTmixed, data = complete_cases_data, stats = TRUE))
+  
+  
+  n1=n2=n3=p1=p2=p3=NULL
+  for(p in 1:nrow(hold_cc$object$group)){
+    if((length(hold_cc$object$group[,8][[p]])==1&c(hold_cc$object$group[,8][[p]])=="")[1]){
+      n1=c(n1,"")
+      n2=c(n2,"")
+      n3=c(n3,"")
+      p1=c(p1,"")
+      p2=c(p2,"")
+      p3=c(p3,"")
+    }else if(length(hold_cc$object$group[,8][[p]])==1){
+      n1=c(n1,hold_cc$object$group[,8][[p]][1])
+      n2=c(n2,hold_cc$object$group[,9][[p]][1])
+      n3=c(n3,hold_cc$object$group[,10][[p]][1])
+      p1=c(p1,"")
+      p2=c(p2,"")
+      p3=c(p3,"")
+    }else{
+      n1=c(n1,hold_cc$object$group[,8][[p]][1])
+      n2=c(n2,hold_cc$object$group[,9][[p]][1])
+      n3=c(n3,hold_cc$object$group[,10][[p]][1])
+      p1=c(p1,hold_cc$object$group[,8][[p]][2])
+      p2=c(p2,hold_cc$object$group[,9][[p]][2])
+      p3=c(p3,hold_cc$object$group[,10][[p]][2])
+      
+    }
+  }
+  
+  
+  delt=se=NULL
+  for(p in 1:nrow(hold_cc$object$group)){
+    if(n1[p]==""){
+      size1=as.numeric(n1[p+2])+as.numeric(n1[p+3])
+      size2=as.numeric(n2[p+2])+as.numeric(n2[p+3])
+      prob1=as.numeric(p1[p+2])/100
+      prob2=as.numeric(p2[p+2])/100
+      avg=(prob1*size1+prob2*size2)/(size1+size2)
+      delt=c(delt,(prob1-prob2))
+      se=c(se,sqrt(avg*(1-avg)/sqrt(size1+size2)))
+      
+    }else{
+      delt=c(delt,"")
+      se=c(se,"")
+    }
+  }
+  
+  out_tab_cc=data.frame(n1,p1,n2,p2,n3,p3,delt,se)
+  for(p in 1:ncol(out_tab_cc)){
+    out_tab_cc[,p]=ifelse(out_tab_cc[,p]=="",NA,out_tab_cc[,p])
+    out_tab_cc[,p]=as.numeric(out_tab_cc[,p])
+  }
+  nam=NULL
+  count=rep(0:3,nrow(out_tab_cc)/4)
+  for(p in 1:nrow(out_tab_cc)){
+    if(count[p]==0){
+      nam=c(nam,hold_cc$object$group$variable[p])
+    }else{
+      nam=c(nam,paste(hold_cc$object$group$variable[p],hold_cc$object$group$label[p]))
+    }
+  }
+  out_tab_cc=data.frame(out_tab_cc)
+  rownames(out_tab_cc)=c(nam)
+  
+  
+  pe_tab=out_tab
+  se_tab=out_tab
+  df_tab=out_tab
+  for(q in 1:(ncol(out_tab)-1)){
+    for(p in 1:nrow(out_tab)){
+      if(names(out_tab)[q]%in%c("p1","p2","p3")){
+        est_hold=NULL
+        for(r in 1:imp_num){
+          est_hold=c(est_hold,imp_tab[[r]][p,q]/100)
+        }
+        bar_pe=mean(est_hold)
+        bar_se=sqrt(mean(est_hold)*(1-mean(est_hold))/nrow(complete_cases_data))
+        v=var(est_hold)
+        v_tot=bar_se^2+v+v/imp_num
+        df=(imp_num-1)*(1+(bar_se^2/((v+(v/imp_num)))))^2
+        
+        pe_tab[p,q]=bar_pe
+        se_tab[p,q]=sqrt(v_tot)
+        df_tab[p,q]=df
+      }else if(names(out_tab)[q]=="delt"){
+        est_hold1=est_hold2=NULL
+        for(r in 1:imp_num){
+          est_hold1=c(est_hold1,imp_tab[[r]][p,q])
+          est_hold2=c(est_hold2,imp_tab[[r]][p,(q+1)])
+        }
+        bar_pe=mean(est_hold1)
+        bar_se=mean(est_hold2)
+        v=var(est_hold1)
+        v_tot=bar_se^2+v+v/imp_num
+        df=(imp_num-1)*(1+(bar_se^2/((v+(v/imp_num)))))^2
+        
+        pe_tab[p,q]=bar_pe
+        se_tab[p,q]=sqrt(v_tot)
+        df_tab[p,q]=df
+        
+      }
+      
+    }
+  }
+  
+  
+  fin_tab=data.frame(out_tab_cc)
+  fin_tab$df=NA
+  fin_tab$prob=NA
+  counter=1
+  order=rep(1:4,nrow(fin_tab/4))
+  for(p in 1:nrow(fin_tab)){
+    if(order[p]==1){
+      fin_tab[p,7]=paste(round(pe_tab[counter,7]*100,rounding+1),"%",sep="")
+      fin_tab[p,8]=round(pe_tab[counter,7]/se_tab[counter,7],2)
+      fin_tab[p,9]=round(df_tab[counter,7],2)
+      fin_tab[p,10]=ifelse(round(pt(-abs(pe_tab[counter,7]/se_tab[counter,7]),df_tab[counter,7])*2,4)<0.0001,
+                           "< 0.0001",round(pt(-abs(pe_tab[counter,7]/se_tab[counter,7]),df_tab[counter,7])*2,4))
+      
+      counter=counter+1
+    }else if(order[p]==2){
+      
+    }else{
+      for(q in c(2,4,6)){
+        pe=round(pe_tab[counter,q]*100,rounding)
+        ll=round((pe_tab[counter,q]+qt(0.025,df_tab[counter,q])*se_tab[counter,q])*100,rounding)
+        ul=round((pe_tab[counter,q]+qt(0.975,df_tab[counter,q])*se_tab[counter,q])*100,rounding)
+        ll=ifelse(ll<0,0,ll)
+        ll=ifelse(ll>100,100,ll)
+        ul=ifelse(ul<0,0,ul)
+        ul=ifelse(ul>100,100,ul)
+        fin_tab[p,q]=paste(pe,"% [",ll,"%-",ul,"%]",sep="")
+      }
+      counter=counter+1
+    }
+  }
+  
+  for(p in 1:nrow(fin_tab)){
+    for(q in 1:ncol(fin_tab)){
+      fin_tab[p,q]=ifelse(is.na(fin_tab[p,q]),"",fin_tab[p,q])
+    }
+  }
+  
+  
+  nam=NULL
+  count=rep(0:3,nrow(fin_tab)/4)
+  xval=0
+  for(p in 1:nrow(fin_tab)){
+    if(count[p]==0){
+      xval=xval+1
+      nam=c(nam,paste("X",xval,": ",hold_cc$object$group$variable[p],sep=""))
+    }else{
+      nam=c(nam,paste("X",xval,": ",hold_cc$object$group$label[p],sep=""))
+    }
+  }
+  rownames(fin_tab)=c(nam)
+  fin_tab=rbind(c("","Comparison Group","","TB Survivors","","Total","","Difference","",""),fin_tab)
+  rownames(fin_tab)[1]=""
+  names(fin_tab)=c("N","%","N","%","N","%","PE","t","DF","p")
+  print(fin_tab)
+  blurb=data.frame("Note: N represents the complete case frequencies, % represents the imputed percenage and 95% CI, PE represents he difference in percentages between TB survivors and matched controls, t is the corresponding t statistic, DF the degrees of freedom, and p the interence.")
+  names(blurb)=""
+  rownames(blurb)=""
+  print(blurb)
+  return(fin_tab)
+  
+}
